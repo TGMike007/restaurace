@@ -3,6 +3,7 @@ from flask_smorest import Api  # Import Flask-Smorest API
 from .config import config_by_name
 from .db import db, migrate  # Import db a migrate z db.py
 import os
+from flask_jwt_extended import JWTManager
 
 
 def create_app(config_name=None, config_override=None):
@@ -21,6 +22,8 @@ def create_app(config_name=None, config_override=None):
     db.init_app(app)
     migrate.init_app(app, db)
 
+    jwt = JWTManager(app)
+
     # Inicializace Flask-Smorest
     api = Api(app)
 
@@ -31,12 +34,22 @@ def create_app(config_name=None, config_override=None):
 
     # Zde můžete přidat další blueprinty (např. pro webové rozhraní, pokud by bylo)
 
+    @jwt.additional_claims_loader
+    def add_claims_to_access_token(identity):
+        from .models import User
+        user = db.session.get(User, int(identity))
+        if user:
+            return {"role": user.role.value}
+        return {}
     # Shell kontext pro `flask shell`
+
     @app.shell_context_processor
     def make_shell_context():
+        from .models import User
         return {"db": db, "User": User}  # Přidejte sem své modely
 
     # Jednoduchá testovací routa na kořeni
+
     @app.route("/hello")
     def hello():
         return "Hello, World from Flask!"

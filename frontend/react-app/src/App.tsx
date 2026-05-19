@@ -1,36 +1,38 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
+import { JSX } from 'react';
+import MainLayout from './layouts/MainLayout';
 import HomePage from './pages/HomePage';
 import UsersPage from './pages/UsersPage';
-import { JSX } from 'react';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import MenuPage from './pages/MenuPage';
+import OrdersPage from './pages/OrdersPage';
+import ReservationsPage from './pages/ReservationsPage';
+import ShiftsPage from './pages/ShiftsPage';
+import DaysPage from './pages/DaysPage';
+import CustomersPage from './pages/CustomersPage';
 
-function App(): JSX.Element { // Přidán typ návratové hodnoty
+
+
+
+function App(): JSX.Element {
   return (
-    <Router>
-      <div className="flex flex-col min-h-screen min-w-screen bg-gray-100">
-        {/* Jednoduchá Navigace */}
-        <nav className="bg-blue-600 text-white p-4 shadow-md mb-6">
-          <ul className="flex space-x-6 container mx-auto">
-            <li><Link to="/" className="hover:text-blue-200 transition-colors">Domů</Link></li>
-            <li><Link to="/users" className="hover:text-blue-200 transition-colors">Uživatelé</Link></li>
-            {/* Přidejte další odkazy */}
-          </ul>
-        </nav>
+    <Routes>
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<HomePage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="login" element={<LoginPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="menu" element={<MenuPage />} />
+        <Route path="orders" element={<OrdersPage />} />
+        <Route path="reservations" element={<ReservationsPage />} />
+        <Route path="shifts" element={<ShiftsPage />} />
+        <Route path="days" element={<DaysPage />} />
+        <Route path="customers" element={<CustomersPage />} />
 
-        {/* Hlavní obsah */}
-        <main className="flex-grow p-6 container mx-auto">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/users" element={<UsersPage />} />
-            {/* Přidejte další routy */}
-          </Routes>
-        </main>
-
-        {/* Patička (volitelně) */}
-        <footer className="text-center p-4 text-gray-500 mt-auto text-sm">
-          © {new Date().getFullYear()} IS Šablona
-        </footer>
-      </div>
-    </Router>
+        {/* Sem přidávej další stránky */}
+      </Route>
+    </Routes>
   );
 }
 

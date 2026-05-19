@@ -10,41 +10,197 @@
 
 from marshmallow import Schema, fields, validate
 
-# --- Schémata pro model User ---
+# --- User ---
 
 
 class UserSchema(Schema):
-    """
-    Základní schéma pro serializaci objektu User.
-    Používá se typicky pro odpovědi API (GET požadavky).
-    Nezahrnuje citlivá data jako heslo.
-    """
-    # `dump_only=True`: Toto pole bude zahrnuto pouze při serializaci (dumping) objektu na JSON.
-    # Nebude očekáváno ani zpracováno při deserializaci (loading) dat z požadavku.
-    # Typicky se používá pro ID a generovaná pole (jako created_at).
-    id = fields.Int(dump_only=True)
-
-    # `required=True`: Toto pole je povinné při deserializaci (pokud by se toto schéma použilo pro vstup).
-    # Při serializaci musí mít objekt odpovídající atribut.
-    username = fields.Str(required=True, validate=validate.Length(min=3))
-    # `validate=validate.Length(min=3)`: Přidává validační pravidlo - řetězec musí mít minimálně 3 znaky.
-
-    # `fields.Email`: Speciální typ pole, který automaticky validuje formát emailové adresy.
-    email = fields.Email(required=True)
-
-    # `dump_only=True`: Datum vytvoření je generováno serverem/databází, takže ho jen vracíme v odpovědi.
-    created_at = fields.DateTime(dump_only=True)
+    user_id = fields.Int(dump_only=True)
+    name = fields.Str(required=True, validate=validate.Length(min=2, max=15))
+    role = fields.Str(required=True, validate=validate.Length(max=10))
 
 
 class UserCreateSchema(Schema):
+    name = fields.Str(required=True, validate=validate.Length(min=2, max=15))
+    password = fields.Str(required=True, load_only=True,
+                          validate=validate.Length(min=8))
+    role = fields.Str(required=True, validate=validate.Length(max=10))
+
+
+class UserLoginSchema(Schema):
+    name = fields.Str(required=True)
+    password = fields.Str(required=True, load_only=True)
+
+
+# --- TableUnit ---
+
+class TableUnitSchema(Schema):
+    table_unit_id = fields.Int(dump_only=True)
+    seats = fields.Int(required=True)
+
+
+class TableUnitCreateSchema(Schema):
+    seats = fields.Int(required=True, validate=validate.Range(min=1))
+
+
+# --- Customer ---
+
+class CustomerSchema(Schema):
+    customer_id = fields.Int(dump_only=True)
+    name = fields.Str(required=True, validate=validate.Length(min=2, max=20))
+    contact = fields.Str(validate=validate.Length(max=30))
+
+
+class CustomerCreateSchema(Schema):
+    name = fields.Str(required=True, validate=validate.Length(min=2, max=20))
+    contact = fields.Str(validate=validate.Length(max=30))
+
+
+# --- Reservation ---
+
+class ReservationSchema(Schema):
+    reservation_id = fields.Int(dump_only=True)
+    date = fields.Date(required=True)
+    start_time = fields.Time(required=True)
+    end_time = fields.Time(required=True)
+    person_count = fields.Int(required=True)
+    customer_id = fields.Int(required=True)
+    table_unit_id = fields.Int(required=True)
+
+
+class ReservationCreateSchema(Schema):
+    date = fields.Date(required=True)
+    start_time = fields.Time(required=True)
+    end_time = fields.Time(required=True)
+    person_count = fields.Int(required=True)
+    customer_id = fields.Int(required=True)
+    table_unit_id = fields.Int(required=True)
+
+
+# --- Order ---
+
+class OrderSchema(Schema):
+    order_id = fields.Int(dump_only=True)
+    price = fields.Decimal(as_string=True)
+    status = fields.Str(validate=validate.Length(max=20))
+    table_unit_id = fields.Int(required=True)
+    user_id = fields.Int(required=True)
+
+
+class OrderCreateSchema(Schema):
+    price = fields.Decimal(as_string=True)
+    status = fields.Str(validate=validate.Length(max=20))
+    table_unit_id = fields.Int(required=True)
+    user_id = fields.Int(required=True)
+
+
+# --- MenuItem ---
+
+class MenuItemSchema(Schema):
+    menuitem_id = fields.Int(dump_only=True)
+    name = fields.Str(required=True, validate=validate.Length(min=2, max=100))
+    price = fields.Decimal(required=True, as_string=True)
+    available = fields.Bool()
+
+
+class MenuItemCreateSchema(Schema):
+    name = fields.Str(required=True, validate=validate.Length(min=2, max=100))
+    price = fields.Decimal(required=True, as_string=True)
+    available = fields.Bool()
+
+
+# --- OrderItem ---
+
+class OrderItemSchema(Schema):
+    orderitem_id = fields.Int(dump_only=True)
+    quantity = fields.Int(required=True)
+    price = fields.Decimal(required=True, as_string=True)
+    note = fields.Str(validate=validate.Length(max=255))
+    order_id = fields.Int(required=True)
+    menuitem_id = fields.Int(required=True)
+
+
+class OrderItemCreateSchema(Schema):
+    quantity = fields.Int(required=True)
+    price = fields.Decimal(required=True, as_string=True)
+    note = fields.Str(validate=validate.Length(max=255))
+    order_id = fields.Int(required=True)
+    menuitem_id = fields.Int(required=True)
+
+
+# --- Payment ---
+
+class PaymentSchema(Schema):
+    payment_id = fields.Int(dump_only=True)
+    amount = fields.Decimal(required=True, as_string=True)
+    type = fields.Str(validate=validate.Length(max=50))
+    status = fields.Str(validate=validate.Length(max=50))
+    order_id = fields.Int(required=True)
+
+
+class PaymentCreateSchema(Schema):
+    amount = fields.Decimal(required=True, as_string=True)
+    type = fields.Str(validate=validate.Length(max=50))
+    status = fields.Str(validate=validate.Length(max=50))
+    order_id = fields.Int(required=True)
+
+
+# --- Shift ---
+
+class ShiftSchema(Schema):
+    shift_id = fields.Int(dump_only=True)
+    date = fields.Date(required=True)
+    start_time = fields.Time(required=True)
+    end_time = fields.Time(required=True)
+    status = fields.Str(validate=validate.Length(max=50))
+
+
+class ShiftCreateSchema(Schema):
+    date = fields.Date(required=True)
+    start_time = fields.Time(required=True)
+    end_time = fields.Time(required=True)
+    status = fields.Str(validate=validate.Length(max=50))
+
+
+# --- UserShift ---
+
+class UserShiftSchema(Schema):
+    user_id = fields.Int(required=True)
+    shift_id = fields.Int(required=True)
+
+
+# --- Day ---
+
+class DaySchema(Schema):
+    date = fields.Date(dump_only=True)
+    status = fields.Str(validate=validate.Length(max=50))
+    user_id = fields.Int()
+
+
+class DayCreateSchema(Schema):
+    date = fields.Date(required=True)
+    status = fields.Str(validate=validate.Length(max=50))
+    user_id = fields.Int()
+
+
+# --- Report ---
+
+class ReportSchema(Schema):
+    report_id = fields.Int(dump_only=True)
+    content = fields.Str()
+    date = fields.Date()
+
+
+class ReportCreateSchema(Schema):
+    content = fields.Str()
+    date = fields.Date(required=True)
     """
     Schéma specificky navržené pro deserializaci a validaci dat
     při vytváření nového uživatele (POST požadavek).
     Může se lišit od UserSchema (např. může obsahovat pole pro heslo).
     """
     # Pole jsou stejná jako v UserSchema, protože pro vytvoření potřebujeme username a email.
-    username = fields.Str(required=True, validate=validate.Length(min=3))
-    email = fields.Email(required=True)
+    # username = fields.Str(required=True, validate=validate.Length(min=3))
+    # email = fields.Email(required=True)
 
     # `load_only=True`: Toto pole bude očekáváno a zpracováno POUZE při deserializaci (loading)
     # dat z požadavku (např. JSON z POST). Nebude nikdy zahrnuto v odpovědi API (dumping).

@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 # Načtení proměnných z .env souboru
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -13,6 +14,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Nastavte na True pro logování SQL dotazů
 
+    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+
     # Konfigurace pro Flask-Smorest (OpenAPI)
     API_TITLE = "IS Šablona API"
     API_VERSION = "v1"
@@ -20,6 +26,19 @@ class Config:
     OPENAPI_URL_PREFIX = "/api/docs"
     OPENAPI_SWAGGER_UI_PATH = "/swagger"
     OPENAPI_SWAGGER_UI_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
+    API_SPEC_OPTIONS = {
+        "security": [{"bearerAuth": []}],
+        "components": {
+            "securitySchemes":
+            {
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "JWT"
+                }
+            }
+        }
+    }
 
 
 class DevelopmentConfig(Config):
@@ -31,6 +50,9 @@ class DevelopmentConfig(Config):
         or "postgresql+psycopg://user:password@localhost/dev_db"
     )
     SQLALCHEMY_ECHO = True  # Logování SQL ve vývoji může být užitečné
+
+    if not Config.JWT_SECRET_KEY:
+        Config.JWT_SECRET_KEY = "key change in production"
 
 
 class TestingConfig(Config):
