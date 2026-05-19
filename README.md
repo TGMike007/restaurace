@@ -1,4 +1,4 @@
-# Šablona projektu pro vývoj IS
+# Šablona projektu pro vývoj IS - TEST
 
 Tato šablona slouží jako výchozí bod pro vývoj informačního systému v rámci předmětu Vývoj IS. Poskytuje základní strukturu a konfiguraci pro moderní webovou aplikaci s odděleným backendem (Flask/Flask-Smorest) a frontendem (React/Vite), využívající kontejnerizaci pomocí Dockeru a optimalizovanou pro vývoj v Dev Containers (VS Code).
 
