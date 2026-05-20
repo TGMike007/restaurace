@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
 
 interface User {
     user_id: number;
@@ -17,7 +19,7 @@ const UsersPage: React.FC = () => {
     const [editUser, setEditUser] = useState<User | null>(null);
     const [form, setForm] = useState({ name: '', password: '', role: 'cisnik' });
 
-    const token = localStorage.getItem('access_token');
+    const { token } = useAuth();
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchUsers = async () => {
@@ -41,7 +43,7 @@ const UsersPage: React.FC = () => {
             if (editUser) {
                 await axios.put(`/api/v1/users/${editUser.user_id}`, form, { headers });
             } else {
-                await axios.post('/api/v1/register', form);
+                await axios.post('/api/v1/register', form, { headers });
             }
             setShowForm(false);
             setEditUser(null);
@@ -73,6 +75,7 @@ const UsersPage: React.FC = () => {
         if (role === 'vedouci') return 'bg-yellow-800 text-yellow-300';
         return 'bg-blue-800 text-blue-300';
     };
+
 
     if (loading) return <p className="text-gray-400 text-center">Načítám uživatele...</p>;
 

@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const LoginPage: React.FC = () => {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
+    const location = useLocation();
+    const { login } = useAuth();
+
+    const from = (location.state as { from?: string })?.from;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const response = await axios.post('/api/v1/login', { name, password });
-            localStorage.setItem('access_token', response.data.access_token);
-            navigate('/');
+            await login(name, password);
+            // Přesměruj na původní stránku pokud má uživatel přístup, jinak na dashboard
+            if (from && from !== '/login') {
+                navigate(from, { replace: true });
+            } else {
+                navigate('/dashboard', { replace: true });
+            }
         } catch {
             setError('Nesprávné jméno nebo heslo.');
         }

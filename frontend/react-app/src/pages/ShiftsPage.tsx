@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { getUserRole } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
+
 
 interface Shift {
     shift_id: number;
@@ -35,9 +36,8 @@ const ShiftsPage: React.FC = () => {
     const [form, setForm] = useState({ date: '', start_time: '', end_time: '', status: 'planovana' });
     const [assignUserId, setAssignUserId] = useState('');
 
-    const role = getUserRole();
+    const { token, role } = useAuth();
     const canEdit = role === 'vedouci' || role === 'admin';
-    const token = localStorage.getItem('access_token');
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchShifts = async () => {

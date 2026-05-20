@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { getUserRole } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
+
 
 interface MenuItem {
     menuitem_id: number;
@@ -19,7 +21,7 @@ const MenuPage: React.FC = () => {
 
     const role = getUserRole();
     const canEdit = role === 'vedouci' || role === 'admin';
-    const token = localStorage.getItem('access_token');
+    const { token } = useAuth();
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchItems = async () => {

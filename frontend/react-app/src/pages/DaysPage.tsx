@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
 
 interface Day {
     date: string;
@@ -34,7 +36,7 @@ const DaysPage: React.FC = () => {
     const [editReport, setEditReport] = useState<Report | null>(null);
     const [showReportForm, setShowReportForm] = useState<string | null>(null);
 
-    const token = localStorage.getItem('access_token');
+    const { token } = useAuth();
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchDays = async () => {

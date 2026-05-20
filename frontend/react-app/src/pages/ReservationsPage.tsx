@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { getUserRole } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
 
 interface Reservation {
     reservation_id: number;
@@ -40,8 +40,8 @@ const ReservationsPage: React.FC = () => {
         table_unit_id: '',
     });
 
-    const role = getUserRole();
-    const token = localStorage.getItem('access_token');
+    const role = useAuth();
+    const { token } = useAuth();
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchReservations = async () => {

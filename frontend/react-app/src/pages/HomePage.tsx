@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
 
 interface TableUnit {
     table_unit_id: number;
@@ -29,7 +31,7 @@ const HomePage: React.FC = () => {
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const navigate = useNavigate();
 
-    const token = localStorage.getItem('access_token');
+    const { token } = useAuth();
 
     useEffect(() => {
     axios.get('/api/v1/tables').then(r => setTables(r.data)).catch(() => {});

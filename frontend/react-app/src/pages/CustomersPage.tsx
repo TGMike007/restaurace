@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
 
 interface Customer {
     customer_id: number;
@@ -15,13 +17,14 @@ const CustomersPage: React.FC = () => {
     const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
     const [form, setForm] = useState({ name: '', contact: '' });
 
-    const token = localStorage.getItem('access_token');
-    const headers = { Authorization: `Bearer ${token}` };
+    const { token } = useAuth();
 
     const fetchCustomers = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/v1/customers', { headers });
+            const response = await axios.get('/api/v1/customers', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setCustomers(response.data);
             setError(null);
         } catch {
@@ -31,15 +34,17 @@ const CustomersPage: React.FC = () => {
         }
     };
 
-    useEffect(() => { fetchCustomers(); }, []);
+    useEffect(() => { fetchCustomers(); }, [token]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             if (editCustomer) {
-                await axios.put(`/api/v1/customers/${editCustomer.customer_id}`, form, { headers });
+                await axios.put(`/api/v1/customers/${editCustomer.customer_id}`, form, {
+                headers: { Authorization: `Bearer ${token}` } });
             } else {
-                await axios.post('/api/v1/customers', form, { headers });
+                await axios.post('/api/v1/customers', form, {
+                headers: { Authorization: `Bearer ${token}` } });
             }
             setShowForm(false);
             setEditCustomer(null);
@@ -59,7 +64,8 @@ const CustomersPage: React.FC = () => {
     const handleDelete = async (id: number) => {
         if (!confirm('Opravdu smazat tohoto zákazníka?')) return;
         try {
-            await axios.delete(`/api/v1/customers/${id}`, { headers });
+            await axios.delete(`/api/v1/customers/${id}`, {
+                headers: { Authorization: `Bearer ${token}` } });
             fetchCustomers();
         } catch {
             setError('Nepodařilo se smazat zákazníka.');

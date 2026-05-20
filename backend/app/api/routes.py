@@ -38,8 +38,8 @@ from ..utils.decorators import roles_required
 @api_v1_bp.route("/tables")
 class TableUnitsResource(MethodView):
 
-    # @jwt_required()
-    # @roles_required(UserRole.cisnik.value, UserRole.vedouci.value, UserRole.admin.value)
+    @jwt_required()
+    @roles_required(UserRole.cisnik.value, UserRole.vedouci.value, UserRole.admin.value)
     @api_v1_bp.response(200, TableUnitSchema(many=True))
     def get(self):
         """Získat seznam všech stolů."""
@@ -190,8 +190,8 @@ class CustomerResource(MethodView):
 @api_v1_bp.route("/reservations")
 class ReservationsResource(MethodView):
 
-    # @jwt_required()
-    # @roles_required(UserRole.cisnik.value, UserRole.vedouci.value, UserRole.admin.value)
+    @jwt_required()
+    @roles_required(UserRole.cisnik.value, UserRole.vedouci.value, UserRole.admin.value)
     @api_v1_bp.response(200, ReservationSchema(many=True))
     def get(self):
         """Získat seznam všech rezervací."""
@@ -858,8 +858,8 @@ class ReportResource(MethodView):
 @api_v1_bp.route("/users")
 class UsersResource(MethodView):
 
-    # @jwt_required()
-    # @roles_required(UserRole.admin.value)
+    @jwt_required()
+    @roles_required(UserRole.admin.value)
     @api_v1_bp.response(200, UserSchema(many=True))
     def get(self):
         """Získat seznam všech uživatelů."""

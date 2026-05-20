@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserRole } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
+
 
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
-    const role = getUserRole();
+    const { role } = useAuth();
 
     if (!role) {
         navigate('/login');

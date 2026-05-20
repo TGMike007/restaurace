@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { getUserRole } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
+
 
 interface Order {
     order_id: number;
@@ -46,8 +47,7 @@ const OrdersPage: React.FC = () => {
     const [itemForm, setItemForm] = useState({ menuitem_id: '', quantity: '1', note: '' });
     const [addingItemToOrder, setAddingItemToOrder] = useState<number | null>(null);
 
-    const role = getUserRole();
-    const token = localStorage.getItem('access_token');
+    const { token, role } = useAuth(); // ← správně
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchOrders = async () => {
