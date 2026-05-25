@@ -12,6 +12,8 @@ import DaysPage from './pages/DaysPage';
 import CustomersPage from './pages/CustomersPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import TablesPage from './pages/TablesPage';
+
 
 
 function App(): JSX.Element {
@@ -54,6 +56,11 @@ function App(): JSX.Element {
             <CustomersPage />
           </ProtectedRoute>
         } />
+        <Route path="tables" element={
+          <ProtectedRoute allowedRoles={['cisnik', 'vedouci', 'admin']}>
+            <TablesPage />
+          </ProtectedRoute>
+        } />
 
         {/* Pouze vedoucí a admin */}
         <Route path="days" element={
@@ -69,6 +76,7 @@ function App(): JSX.Element {
             <UsersPage />
           </ProtectedRoute>
         } />
+        
 
       </Route>
     </Routes>

@@ -59,6 +59,14 @@ const DashboardPage: React.FC = () => {
                     <h2 className="text-xl font-semibold text-white mb-2">Zákazníci</h2>
                     <p className="text-gray-400">Správa zákazníků</p>
                 </div>
+                                        
+                <div
+                    onClick={() => navigate('/tables')}
+                    className="bg-gray-800 p-6 rounded shadow cursor-pointer hover:bg-gray-700 transition-colors"
+                >
+                    <h2 className="text-xl font-semibold text-white mb-2">Stoly</h2>
+                    <p className="text-gray-400">Přehled a správa stolů</p>
+                </div>
             </div>
 
             {/* Pouze vedoucí a admin */}

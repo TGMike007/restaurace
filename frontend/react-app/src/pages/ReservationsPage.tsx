@@ -40,14 +40,13 @@ const ReservationsPage: React.FC = () => {
         table_unit_id: '',
     });
 
-    const role = useAuth();
-    const { token } = useAuth();
+    const { token, role } = useAuth();
     const headers = { Authorization: `Bearer ${token}` };
 
     const fetchReservations = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/v1/reservations');
+            const response = await axios.get('/api/v1/reservations', { headers });
             setReservations(response.data);
             setError(null);
         } catch {
@@ -59,12 +58,64 @@ const ReservationsPage: React.FC = () => {
 
     useEffect(() => {
         fetchReservations();
-        axios.get('/api/v1/tables').then(r => setTables(r.data)).catch(() => {});
+        axios.get('/api/v1/tables', { headers }).then(r => setTables(r.data)).catch(() => {});
         axios.get('/api/v1/customers', { headers }).then(r => setCustomers(r.data)).catch(() => {});
     }, []);
 
+    // Bezpečné dynamické filtrování stolů s normalizací formátů
+    const getAvailableTables = () => {
+        return tables.filter(table => {
+            // 1. KONTROLA KAPACITY
+            const requiredSeats = parseInt(form.person_count, 10) || 1;
+            if (table.seats < requiredSeats) return false;
+
+            // 2. KONTROLA ČASOVÉHO PŘEKRYVU
+            if (form.date && form.start_time && form.end_time) {
+                // Normalizace formulářových hodnot (oříznutí na přesný počet znaků)
+                const formDate = form.date.slice(0, 10);      // "YYYY-MM-DD"
+                const formStart = form.start_time.slice(0, 5);  // "HH:MM"
+                const formEnd = form.end_time.slice(0, 5);      // "HH:MM"
+
+                const isOccupied = reservations.some(res => {
+                    // Ignorujeme vlastní rezervaci při úpravách
+                    if (editReservation && res.reservation_id === editReservation.reservation_id) {
+                        return false;
+                    }
+
+                    // Jistota číselného porovnání ID stolů
+                    if (Number(res.table_unit_id) !== Number(table.table_unit_id)) return false;
+
+                    // Defenzivní normalizace dat z backendu (ošetření sekund a ISO formátů)
+                    const resDate = res.date ? res.date.slice(0, 10) : '';
+                    const resStart = res.start_time ? res.start_time.slice(0, 5) : '';
+                    const resEnd = res.end_time ? res.end_time.slice(0, 5) : '';
+
+                    // Pokud se neshoduje den, stůl je v tento den volný
+                    if (resDate !== formDate) return false;
+
+                    // Matematická logika překryvu: (Začátek_Nové < Konec_Staré) A (Začátek_Staré < Konec_Nové)
+                    return formStart < resEnd && resStart < formEnd;
+                });
+
+                if (isOccupied) return false;
+            }
+
+            return true;
+        });
+    };
+
+    const availableTables = getAvailableTables();
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Pojistka pro případ, že by se odeslal nevalidní stůl
+        const isTableValid = availableTables.some(t => String(t.table_unit_id) === form.table_unit_id);
+        if (!isTableValid) {
+            setError('Vybraný stůl neodpovídá kapacitě nebo je v tomto čase již obsazený.');
+            return;
+        }
+
         try {
             const data = {
                 date: form.date,
@@ -91,9 +142,9 @@ const ReservationsPage: React.FC = () => {
     const handleEdit = (r: Reservation) => {
         setEditReservation(r);
         setForm({
-            date: r.date,
-            start_time: r.start_time,
-            end_time: r.end_time,
+            date: r.date.slice(0, 10),
+            start_time: r.start_time.slice(0, 5),
+            end_time: r.end_time.slice(0, 5),
             person_count: String(r.person_count),
             customer_id: String(r.customer_id),
             table_unit_id: String(r.table_unit_id),
@@ -152,7 +203,7 @@ const ReservationsPage: React.FC = () => {
                                 <input
                                     type="date"
                                     value={form.date}
-                                    onChange={e => setForm({ ...form, date: e.target.value })}
+                                    onChange={e => setForm({ ...form, date: e.target.value, table_unit_id: '' })}
                                     className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500"
                                     required
                                 />
@@ -163,7 +214,7 @@ const ReservationsPage: React.FC = () => {
                                     type="number"
                                     min="1"
                                     value={form.person_count}
-                                    onChange={e => setForm({ ...form, person_count: e.target.value })}
+                                    onChange={e => setForm({ ...form, person_count: e.target.value, table_unit_id: '' })}
                                     className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500"
                                     required
                                 />
@@ -173,7 +224,7 @@ const ReservationsPage: React.FC = () => {
                                 <input
                                     type="time"
                                     value={form.start_time}
-                                    onChange={e => setForm({ ...form, start_time: e.target.value })}
+                                    onChange={e => setForm({ ...form, start_time: e.target.value, table_unit_id: '' })}
                                     className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500"
                                     required
                                 />
@@ -183,7 +234,7 @@ const ReservationsPage: React.FC = () => {
                                 <input
                                     type="time"
                                     value={form.end_time}
-                                    onChange={e => setForm({ ...form, end_time: e.target.value })}
+                                    onChange={e => setForm({ ...form, end_time: e.target.value, table_unit_id: '' })}
                                     className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500"
                                     required
                                 />
@@ -209,20 +260,30 @@ const ReservationsPage: React.FC = () => {
                                 <select
                                     value={form.table_unit_id}
                                     onChange={e => setForm({ ...form, table_unit_id: e.target.value })}
-                                    className="w-full bg-gray-700 border border-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:border-blue-500"
+                                    className={`w-full bg-gray-700 text-white rounded px-3 py-2 focus:outline-none border ${availableTables.length === 0 ? 'border-red-500' : 'border-gray-600 focus:border-blue-500'}`}
                                     required
+                                    disabled={availableTables.length === 0}
                                 >
                                     <option value="">Vyberte stůl</option>
-                                    {tables.map(t => (
+                                    {availableTables.map(t => (
                                         <option key={t.table_unit_id} value={t.table_unit_id}>
                                             Stůl #{t.table_unit_id} ({t.seats} míst)
                                         </option>
                                     ))}
                                 </select>
+                                {availableTables.length === 0 && (
+                                    <p className="text-red-400 text-xs mt-1">
+                                        Kapacita volných stolů pro zadaný čas/počet osob je vyčerpaná.
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="flex gap-3">
-                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
+                            <button 
+                                type="submit" 
+                                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                disabled={availableTables.length === 0}
+                            >
                                 {editReservation ? 'Uložit změny' : 'Vytvořit'}
                             </button>
                             <button type="button" onClick={() => { setShowForm(false); setEditReservation(null); }} className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-500 transition-colors">
@@ -241,7 +302,7 @@ const ReservationsPage: React.FC = () => {
                     {reservations.map(r => (
                         <div key={r.reservation_id} className="bg-gray-800 p-4 rounded shadow flex justify-between items-center">
                             <div>
-                                <div className="text-white font-semibold">{r.date} — {r.start_time} až {r.end_time}</div>
+                                <div className="text-white font-semibold">{r.date.slice(0,10)} — {r.start_time.slice(0,5)} až {r.end_time.slice(0,5)}</div>
                                 <div className="text-gray-400 text-sm">{getCustomerName(r.customer_id)} · {getTableLabel(r.table_unit_id)} · {r.person_count} osob</div>
                             </div>
                             {role && (
