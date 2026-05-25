@@ -40,16 +40,78 @@ const ShiftsPage: React.FC = () => {
     const canEdit = role === 'vedouci' || role === 'admin';
     const headers = { Authorization: `Bearer ${token}` };
 
+    const determineStatus = (shift: Shift): string => {
+        if (shift.status === 'zrusena') return shift.status;
+
+        const now = new Date();
+        
+        // 1. Ošetření data: převedeme "YYYY-MM-DD" na spolehlivější "YYYY/MM/DD"
+        // (Safari a některé verze JS mají s pomlčkami problémy)
+        const dateStr = shift.date.substring(0, 10).replace(/-/g, '/');
+        
+        // 2. Ošetření času: Zabezpečení proti formátu z backendu a přidání úvodní nuly (např. "8:00" -> "08:00")
+        let startStr = shift.start_time.substring(0, 5);
+        if (startStr.indexOf(':') === 1) startStr = '0' + startStr; 
+        
+        let endStr = shift.end_time.substring(0, 5);
+        if (endStr.indexOf(':') === 1) endStr = '0' + endStr;
+
+        // Vytvoření bezpečných Date objektů (lokální čas prohlížeče)
+        const start = new Date(`${dateStr} ${startStr}:00`);
+        const end = new Date(`${dateStr} ${endStr}:00`);
+
+        // Pokud je noční směna (konec je v hodinách dřív než začátek)
+        if (end < start) {
+            end.setDate(end.getDate() + 1); 
+        }
+
+        let realStatus = 'planovana';
+        if (now >= start && now <= end) {
+            realStatus = 'probihajici';
+        } else if (now > end) {
+            realStatus = 'dokoncena';
+        }
+
+        // TÍMTO UVIDÍME PŘESNOU CHYBU V KONZOLI
+        console.log(`[DIAGNOSTIKA] Směna #${shift.shift_id} | Začátek: ${start.toLocaleString()} | Konec: ${end.toLocaleString()} | Aktuální čas: ${now.toLocaleString()} ---> Vypočtený stav: ${realStatus}`);
+
+        return realStatus;
+    };
+
     const fetchShifts = async () => {
         try {
-            setLoading(true);
-            const response = await axios.get('/api/v1/shifts', { headers });
-            setShifts(response.data);
-            setError(null);
+            setLoading(true); // 
+            const response = await axios.get('/api/v1/shifts', { headers }); // [cite: 322]
+            const fetchedShifts: Shift[] = response.data;
+
+            // Projdeme směny a zkontrolujeme / zaktualizujeme jejich stavy
+            const updatedShifts = await Promise.all(
+                fetchedShifts.map(async (shift) => {
+                    const realStatus = determineStatus(shift);
+                    
+                    // Pokud se stav v DB liší od reality, opravíme ho i na backendu
+                    if (shift.status !== realStatus) {
+                        try {
+                            await axios.put(`/api/v1/shifts/${shift.shift_id}`, {
+                                ...shift,
+                                status: realStatus
+                            }, { headers });
+                            return { ...shift, status: realStatus };
+                        } catch (e) {
+                            console.error(`Nepodařilo se synchronizovat stav směny ${shift.shift_id}`, e);
+                            return shift; // V případě chyby necháme původní
+                        }
+                    }
+                    return shift;
+                })
+            );
+
+            setShifts(updatedShifts);
+            setError(null); // [cite: 322]
         } catch {
-            setError('Nepodařilo se načíst směny.');
+            setError('Nepodařilo se načíst směny.'); // [cite: 322]
         } finally {
-            setLoading(false);
+            setLoading(false); // [cite: 323]
         }
     };
 

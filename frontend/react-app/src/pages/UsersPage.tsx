@@ -41,16 +41,17 @@ const UsersPage: React.FC = () => {
         e.preventDefault();
         try {
             if (editUser) {
-                await axios.put(`/api/v1/users/${editUser.user_id}`, form, { headers });
+                await axios.put(`/api/v1/users/${editUser.user_id}`, form, { headers }); //
             } else {
-                await axios.post('/api/v1/register', form, { headers });
+                // OPRAVA: Změněno z '/api/v1/register' na '/api/v1/users'
+                await axios.post('/api/v1/users', form, { headers });
             }
-            setShowForm(false);
-            setEditUser(null);
-            setForm({ name: '', password: '', role: 'cisnik' });
-            fetchUsers();
+            setShowForm(false); //
+            setEditUser(null); //
+            setForm({ name: '', password: '', role: 'cisnik' }); //
+            fetchUsers(); //
         } catch {
-            setError('Nepodařilo se uložit uživatele.');
+            setError('Nepodařilo se uložit uživatele.'); //
         }
     };
 

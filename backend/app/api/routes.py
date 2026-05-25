@@ -650,7 +650,7 @@ class ShiftResource(MethodView):
 class UserShiftsResource(MethodView):
 
     @jwt_required()
-    @roles_required(UserRole.vedouci.value, UserRole.admin.value)
+    @roles_required(UserRole.cisnik.value, UserRole.vedouci.value, UserRole.admin.value)
     @api_v1_bp.response(200, UserShiftSchema(many=True))
     def get(self):
         """Získat seznam všech přiřazení uživatelů ke směnám."""
@@ -859,7 +859,7 @@ class ReportResource(MethodView):
 class UsersResource(MethodView):
 
     @jwt_required()
-    @roles_required(UserRole.admin.value)
+    @roles_required(UserRole.cisnik.value, UserRole.vedouci.value, UserRole.admin.value)
     @api_v1_bp.response(200, UserSchema(many=True))
     def get(self):
         """Získat seznam všech uživatelů."""
