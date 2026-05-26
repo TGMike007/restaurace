@@ -80,8 +80,8 @@ const ShiftsPage: React.FC = () => {
 
     const fetchShifts = async () => {
         try {
-            setLoading(true); // 
-            const response = await axios.get('/api/v1/shifts', { headers }); // [cite: 322]
+            setLoading(true);
+            const response = await axios.get('/api/v1/shifts', { headers }); // [cite: 83]
             const fetchedShifts: Shift[] = response.data;
 
             // Projdeme směny a zkontrolujeme / zaktualizujeme jejich stavy
@@ -92,10 +92,14 @@ const ShiftsPage: React.FC = () => {
                     // Pokud se stav v DB liší od reality, opravíme ho i na backendu
                     if (shift.status !== realStatus) {
                         try {
+                            // OPRAVA: Posíláme pouze čistá data bez 'shift_id', která schema na backendu vyžaduje
                             await axios.put(`/api/v1/shifts/${shift.shift_id}`, {
-                                ...shift,
+                                date: shift.date,
+                                start_time: shift.start_time,
+                                end_time: shift.end_time,
                                 status: realStatus
-                            }, { headers });
+                            }, { headers }); // [cite: 90, 211]
+                            
                             return { ...shift, status: realStatus };
                         } catch (e) {
                             console.error(`Nepodařilo se synchronizovat stav směny ${shift.shift_id}`, e);
@@ -107,11 +111,11 @@ const ShiftsPage: React.FC = () => {
             );
 
             setShifts(updatedShifts);
-            setError(null); // [cite: 322]
+            setError(null); // [cite: 83]
         } catch {
-            setError('Nepodařilo se načíst směny.'); // [cite: 322]
+            setError('Nepodařilo se načíst směny.'); // [cite: 84]
         } finally {
-            setLoading(false); // [cite: 323]
+            setLoading(false); // [cite: 85]
         }
     };
 

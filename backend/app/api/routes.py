@@ -674,6 +674,157 @@ class UserShiftsResource(MethodView):
             abort(500, message="Interní chyba serveru.")
         return user_shift
 
+    @jwt_required()
+    @roles_required(UserRole.vedouci.value, UserRole.admin.value)
+    @api_v1_bp.arguments(ShiftCreateSchema)
+    @api_v1_bp.response(200, ShiftSchema)
+    def put(self, data, shift_id):
+        """Aktualizovat směnu a automaticky vygenerovat detailní report při jejím dokončení."""
+        shift = db.session.get(Shift, shift_id)
+        if shift is None:
+            abort(404, message="Směna nebyla nalezena.")
+
+        old_status = shift.status
+        new_status = data.get("status")
+
+        # Aktualizace polí směny
+        for key, value in data.items():
+            setattr(shift, key, value)
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            abort(500, message="Interní chyba serveru při aktualizaci směny.")
+
+        # --- AUTOMATICKÉ GENEROVÁNÍ REPORTU ---
+        if old_status != "dokoncena" and new_status == "dokoncena":
+            try:
+                from datetime import datetime, time, timedelta
+
+                # Safe parsování času a data pro zamezení chyb (podpora pro objekty i stringy z DB)
+                if isinstance(shift.date, str):
+                    shift_date = datetime.strptime(
+                        shift.date[:10], "%Y-%m-%d").date()
+                else:
+                    shift_date = shift.date
+
+                if isinstance(shift.start_time, str):
+                    st_parts = [int(x)
+                                for x in shift.start_time.split(':')[:2]]
+                    shift_start = time(st_parts[0], st_parts[1])
+                else:
+                    shift_start = shift.start_time
+
+                if isinstance(shift.end_time, str):
+                    et_parts = [int(x) for x in shift.end_time.split(':')[:2]]
+                    shift_end = time(et_parts[0], et_parts[1])
+                else:
+                    shift_end = shift.end_time
+
+                start_dt = datetime.combine(shift_date, shift_start)
+                end_dt = datetime.combine(shift_date, shift_end)
+
+                # Ošetření přesnoční směny
+                if end_dt < start_dt:
+                    end_dt += timedelta(days=1)
+
+                # 1. ZÍSKÁNÍ ZAMĚSTNANCŮ (UserShift -> User)
+                employees = db.session.execute(
+                    db.select(User.name, User.role)
+                    .join(UserShift, User.user_id == UserShift.user_id)
+                    .where(UserShift.shift_id == shift_id)
+                ).all()
+
+                # 2. ZÍSKÁNÍ OBJEDNÁVEK A TRŽEB (Orders -> User, a vnější vazba na Payments)
+                orders_data = db.session.execute(
+                    db.select(Order.order_id, User.name, Order.status,
+                              Payment.amount, Payment.payment_method)
+                    .join(User, Order.user_id == User.user_id)
+                    .outerjoin(Payment, Order.order_id == Payment.order_id)
+                    .where(Order.created_at >= start_dt, Order.created_at <= end_dt)
+                ).all()
+
+                # 3. ZÍSKÁNÍ REZERVACÍ vytvořených během směny (Reservations -> Customer, TableUnit)
+                reservations_data = db.session.execute(
+                    db.select(Reservation.reservation_id,
+                              Customer.name, TableUnit.number)
+                    .join(Customer, Reservation.customer_id == Customer.customer_id)
+                    .join(TableUnit, Reservation.table_id == TableUnit.table_id)
+                    .where(Reservation.created_at >= start_dt, Reservation.created_at <= end_dt)
+                ).all()
+
+                # 4. ZPRACOVÁNÍ DAT PRO REPORT
+                total_revenue = 0.0
+                method_revenue = {}
+                order_details = []
+
+                for row in orders_data:
+                    order_id, waiter_name, o_status, amount, method = row
+                    amt = float(amount) if amount is not None else 0.0
+                    total_revenue += amt
+
+                    if method:
+                        method_revenue[method] = method_revenue.get(
+                            method, 0.0) + amt
+
+                    order_details.append(
+                        f"- Objednávka #{order_id} | Číšník: {waiter_name} | Stav: {o_status} | Tržba: {amt} Kč"
+                    )
+
+                emp_list = [f"- {emp.name} ({emp.role})" for emp in employees]
+                res_list = [
+                    f"- Rezervace #{r_id} | Zákazník: {c_name} | Stůl č.: {t_num}" for r_id, c_name, t_num in reservations_data]
+                rev_by_method_list = [
+                    f"  * {method}: {amt} Kč" for method, amt in method_revenue.items()]
+
+                # 5. SESTAVENÍ TEXTU REPORTU
+                report_content = (
+                    f"AUTOMATICKÝ REPORT SMĚNY #{shift_id}\n"
+                    f"Datum: {shift_date.strftime('%d.%m.%Y')} ({shift_start.strftime('%H:%M')} - {shift_end.strftime('%H:%M')})\n"
+                    f"========================================\n\n"
+                    f"PŘIŘAZENÍ ZAMĚSTNANCI:\n"
+                    f"{chr(10).join(emp_list) if emp_list else '- Žádní zaměstnanci nebyli přiřazeni.'}\n\n"
+                    f"STATISTIKA TRŽEB A OBJEDNÁVEK:\n"
+                    f"Celkový počet objednávek v tomto čase: {len(orders_data)}\n"
+                    f"Celková celková tržba: {total_revenue} Kč\n"
+                    f"Rozdělení podle platebních metod:\n"
+                    f"{chr(10).join(rev_by_method_list) if rev_by_method_list else '  * Žádné platby.'}\n"
+                    f"Podrobný přehled:\n"
+                    f"{chr(10).join(order_details) if order_details else '- Žádné objednávky.'}\n\n"
+                    f"USKUTEČNĚNÉ REZERVACE (Zapsané do systému během směny):\n"
+                    f"Počet nových rezervací: {len(reservations_data)}\n"
+                    f"{chr(10).join(res_list) if res_list else '- Žádné nové rezervace.'}\n"
+                )
+
+                # 6. ULOŽENÍ REPORTU DO DATABÁZE (Tabulka reports)
+                new_report = Report(
+                    date=shift_date,
+                    content=report_content
+                )
+
+                # Ochrana proti duplicitě reportu pro stejný den (přidá záznam na konec)
+                existing_report = db.session.execute(
+                    db.select(Report).where(Report.date == shift_date)
+                ).scalar_one_or_none()
+
+                if existing_report:
+                    existing_report.content += f"\n\n--- DOPLNĚK SMĚNY #{shift_id} ---\n" + report_content
+                else:
+                    db.session.add(new_report)
+
+                db.session.commit()
+                print(
+                    f"[REPORT] Automatický report pro směnu {shift_id} byl úspěšně uložen.")
+
+            except Exception as report_error:
+                db.session.rollback()
+                # Zachytíme chybu logováním, aby selhání reportu nezpůsobilo pád samotné úpravy směny
+                print(
+                    f"[CRITICAL REPORT ERROR] Selhalo generování reportu: {str(report_error)}")
+
+        return shift
+
 
 @api_v1_bp.route("/user-shifts/<int:user_id>/<int:shift_id>")
 class UserShiftResource(MethodView):
