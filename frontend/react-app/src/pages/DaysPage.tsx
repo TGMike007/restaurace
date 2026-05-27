@@ -56,9 +56,20 @@ const DaysPage: React.FC = () => {
         fetchData();
     }, []);
 
-    // Filtrování dat pro aktuálně zvolený den
-    const currentDayShifts = shifts.filter(s => s.date === selectedDate);
-    const currentDayReport = reports.find(r => r.date === selectedDate);
+// Nová pomocná funkce, která bezpečně převede cokoliv na YYYY-MM-DD v lokálním čase
+    const safeFormatDate = (dateStr: string) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr.substring(0, 10); // Pokud selže převod, vrátí ořez
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    // Filtrování dat pro aktuálně zvolený den s novou funkcí
+    const currentDayShifts = shifts.filter(s => safeFormatDate(s.date) === selectedDate);
+    const currentDayReport = reports.find(r => safeFormatDate(r.date) === selectedDate);
 
     // Odeslání nového nebo upraveného reportu
     const handleReportSubmit = async (e: React.FormEvent) => {
@@ -225,7 +236,7 @@ const DaysPage: React.FC = () => {
 
                         {currentDayReport && !isEditingReport && (
                             <div className="bg-gray-950/70 border border-gray-800 p-4 rounded-lg">
-                                <pre className="text-gray-300 font-mono text-xs whitespace-pre-wrap leading-relaxed">
+                                <pre className="text-gray-300 font-mono text-sm whitespace-pre-wrap leading-relaxed">
                                     {currentDayReport.content}
                                 </pre>
                                 <div className="flex gap-2 mt-4 pt-3 border-t border-gray-900">

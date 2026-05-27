@@ -273,17 +273,16 @@ const OrdersPage: React.FC = () => {
             return;
         }
 
-        setPaymentState(prev => ({ ...prev, status: 'zpracovani_karty' })); // Indikace ukládání
+        setPaymentState(prev => ({ ...prev, status: 'zpracovani_karty' })); 
 
         try {
             if (!activeOrder) throw new Error("Aktivní objednávka nebyla nalezena.");
 
-            // Zjistíme, jestli platíme všechno, nebo jenom část
             const isPartialPayment = paymentState.selection.some(item => item.payQuantity < item.maxQuantity);
             let targetOrderId = activeOrder.order_id;
 
             if (isPartialPayment) {
-                // 1. Založíme "virtuální" novou objednávku pro ty odcházející zákazníky
+                // 1. Založíme novou objednávku pro odcházející zákazníky
                 const newOrderRes = await axios.post('/api/v1/orders', {
                     table_unit_id: activeOrder.table_unit_id,
                     user_id: activeOrder.user_id,
@@ -294,7 +293,6 @@ const OrdersPage: React.FC = () => {
 
                 // 2. Přesuneme zaplacené položky
                 for (const paidItem of paymentState.selection.filter(i => i.payQuantity > 0)) {
-                    // Přidáme k nové zaplacené objednávce
                     await axios.post('/api/v1/order-items', {
                         order_id: targetOrderId,
                         menuitem_id: paidItem.menuitem_id,
@@ -303,12 +301,10 @@ const OrdersPage: React.FC = () => {
                         note: ""
                     }, { headers });
 
-                    // Odebereme z aktuální (rozdělení)
                     await axios.delete(`/api/v1/order-items/${paidItem.orderitem_id}`, { headers });
                     
                     const remainingQty = paidItem.maxQuantity - paidItem.payQuantity;
                     if (remainingQty > 0) {
-                        // Vrátíme zbylý zbytek zpět do staré objednávky
                         await axios.post('/api/v1/order-items', {
                             order_id: activeOrder.order_id,
                             menuitem_id: paidItem.menuitem_id,
@@ -319,25 +315,29 @@ const OrdersPage: React.FC = () => {
                     }
                 }
             } else {
-                // Zaplatili úplně vše - uzavřeme stávající stůl
+                // --- TADY BYLA CHYBA, NYNÍ OPRAVENO ---
+                // Zaplatili úplně vše - uzavřeme stávající stůl a přibalíme povinná ID
                 await axios.put(`/api/v1/orders/${targetOrderId}`, {
+                    table_unit_id: activeOrder.table_unit_id,
+                    user_id: activeOrder.user_id,
                     status: 'zaplaceno',
                     price: paymentState.amount
                 }, { headers });
             }
 
-            // 3. Pokus o zápis do tabulky plateb (Ošetřeno proti pádům!)
+            // 3. Pokus o zápis do tabulky plateb
             try {
                 await axios.post('/api/v1/payments', {
                     order_id: targetOrderId,
                     amount: paymentState.amount,
-                    payment_method: paymentState.method
+                    type: paymentState.method,    // Změněno z payment_method na type
+                    status: 'zaplaceno'           // Přidáno chybějící pole status
                 }, { headers });
-            } catch (paymentErr: unknown) {
-                if (axios.isAxiosError(paymentErr)) {
-                    console.warn("⚠️ Varování: Platba schválena, ale zápis do /payments selhal.", paymentErr.response?.data || paymentErr.message);
+            } catch (_paymentErr: unknown) { // Změněno na _paymentErr
+                if (axios.isAxiosError(_paymentErr)) {
+                    console.warn("⚠️ Varování: Platba schválena, ale zápis do /payments selhal.", _paymentErr.response?.data || _paymentErr.message);
                 } else {
-                    console.warn("⚠️ Varování: Neznámá chyba při ukládání do tabulky plateb.", paymentErr);
+                    console.warn("⚠️ Varování: Neznámá chyba při ukládání do tabulky plateb.", _paymentErr);
                 }
             }
 
@@ -346,23 +346,25 @@ const OrdersPage: React.FC = () => {
             setTimeout(() => {
                 setPaymentState(prev => ({ ...prev, isOpen: false }));
                 if (!isPartialPayment) {
-                    setActiveOrder(null); // Zavřeme účet jen pokud zaplatili vše
+                    setActiveOrder(null); 
                 }
                 fetchData();
             }, 2000);
 
         } catch (err: unknown) {
-            console.error("Kritická chyba při ukládání platby:", err);
+            console.error("DEBUG - Plná chyba:", err); 
             
-            // Bezpečné vytažení chybové hlášky bez 'any'
             let backendMsg = "Neznámá chyba serveru";
             if (axios.isAxiosError(err)) {
-                backendMsg = err.response?.data?.message || err.response?.data?.error || "Neznámá chyba serveru";
+                backendMsg = err.response?.data?.message || 
+                             err.response?.data?.error || 
+                             (err.response?.data ? JSON.stringify(err.response.data) : "") || 
+                             err.message;
             } else if (err instanceof Error) {
                 backendMsg = err.message;
             }
             
-            setPaymentState(prev => ({ ...prev, status: 'chyba', errorMessage: `Systémová chyba: ${backendMsg}` }));
+            setPaymentState(prev => ({ ...prev, status: 'chyba', errorMessage: `Backend hlásí: ${backendMsg}` }));
         }
     };
 
