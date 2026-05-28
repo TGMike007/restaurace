@@ -603,7 +603,6 @@ class ShiftResource(MethodView):
 
     @jwt_required()
     @roles_required(UserRole.vedouci.value, UserRole.admin.value)
-    # nebo ShiftUpdateSchema, záleží jak to máš
     @api_v1_bp.arguments(ShiftCreateSchema)
     @api_v1_bp.response(200, ShiftSchema)
     def put(self, data, shift_id):
@@ -641,6 +640,20 @@ class ShiftResource(MethodView):
             db.session.rollback()
             abort(500, message="Interní chyba serveru při aktualizaci směny.")
 
+        # Zajištění existence dne (Day)
+        existing_day = db.session.execute(
+            db.select(Day).where(Day.date == shift_date)
+        ).scalar_one_or_none()
+
+        if not existing_day:
+            new_day = Day(date=shift_date, status='zavreny', user_id=None)
+            db.session.add(new_day)
+            try:
+                db.session.flush()  # flush aby byl den v DB před případným insertem reportu
+            except Exception:
+                db.session.rollback()
+                abort(500, message="Interní chyba serveru při vytváření uzávěrky dne.")
+
         # --- AUTOMATICKÉ GENEROVÁNÍ REPORTU ---
         if should_generate_report:
             try:
@@ -671,18 +684,19 @@ class ShiftResource(MethodView):
 
                 orders_data = db.session.execute(
                     db.select(Order.order_id, User.name, Order.status,
-                              Payment.amount, Payment.payment_method)
+                              Payment.amount, Payment.type)
                     .join(User, Order.user_id == User.user_id)
                     .outerjoin(Payment, Order.order_id == Payment.order_id)
-                    .where(Order.created_at >= start_dt, Order.created_at <= end_dt)
                 ).all()
 
                 reservations_data = db.session.execute(
-                    db.select(Reservation.reservation_id,
-                              Customer.name, TableUnit.number)
+                    db.select(
+                        Reservation.reservation_id,
+                        Customer.name,
+                        TableUnit.table_unit_id
+                    )
                     .join(Customer, Reservation.customer_id == Customer.customer_id)
-                    .join(TableUnit, Reservation.table_id == TableUnit.table_id)
-                    .where(Reservation.created_at >= start_dt, Reservation.created_at <= end_dt)
+                    .join(TableUnit, Reservation.table_unit_id == TableUnit.table_unit_id)
                 ).all()
 
                 total_revenue = 0.0
@@ -704,9 +718,12 @@ class ShiftResource(MethodView):
 
                 emp_list = [f"- {emp.name} ({emp.role})" for emp in employees]
                 res_list = [
-                    f"- Rezervace #{r_id} | Zákazník: {c_name} | Stůl č.: {t_num}" for r_id, c_name, t_num in reservations_data]
+                    f"- Rezervace #{r_id} | Zákazník: {c_name} | Stůl č.: {t_num}"
+                    for r_id, c_name, t_num in reservations_data
+                ]
                 rev_by_method_list = [
-                    f"  * {method}: {amt} Kč" for method, amt in method_revenue.items()]
+                    f"  * {method}: {amt} Kč" for method, amt in method_revenue.items()
+                ]
 
                 report_content = (
                     f"AUTOMATICKÝ REPORT SMĚNY #{shift_id}\n"
@@ -726,6 +743,7 @@ class ShiftResource(MethodView):
                     f"{chr(10).join(res_list) if res_list else '- Žádné nové rezervace.'}\n"
                 )
 
+                # Tady se report ukládá SPRÁVNĚ, protože proměnná report_content už existuje
                 if existing_report:
                     existing_report.content += f"\n\n--- DOPLNĚK SMĚNY #{shift_id} ---\n" + report_content
                 else:
@@ -843,16 +861,19 @@ class UserShiftsResource(MethodView):
                               Payment.amount, Payment.type)  # <-- OPRAVENO ZDE
                     .join(User, Order.user_id == User.user_id)
                     .outerjoin(Payment, Order.order_id == Payment.order_id)
-                    .where(Order.created_at >= start_dt, Order.created_at <= end_dt)
                 ).all()
 
                 # 3. ZÍSKÁNÍ REZERVACÍ vytvořených během směny (Reservations -> Customer, TableUnit)
                 reservations_data = db.session.execute(
-                    db.select(Reservation.reservation_id,
-                              Customer.name, TableUnit.number)
+                    db.select(
+                        Reservation.reservation_id,
+                        Customer.name,
+                        TableUnit.table_unit_id  # použij skutečný sloupec
+                    )
                     .join(Customer, Reservation.customer_id == Customer.customer_id)
-                    .join(TableUnit, Reservation.table_id == TableUnit.table_id)
-                    .where(Reservation.created_at >= start_dt, Reservation.created_at <= end_dt)
+                    # správný join
+                    .join(TableUnit, Reservation.table_unit_id == TableUnit.table_unit_id)
+                    # pokud nechceš časové filtrování, odstraň where; jinak uprav podle existujících timestampů
                 ).all()
 
                 # 4. ZPRACOVÁNÍ DAT PRO REPORT

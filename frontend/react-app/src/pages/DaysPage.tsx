@@ -32,16 +32,18 @@ const DaysPage: React.FC = () => {
     const [isEditingReport, setIsEditingReport] = useState(false);
 
     const { token } = useAuth();
-    const headers = { Authorization: `Bearer ${token}` };
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const [reportsRes, shiftsRes] = await Promise.all([
-                axios.get('/api/v1/reports', { headers }),
-                axios.get('/api/v1/shifts', { headers })
+                axios.get('/api/v1/reports', { 
+                    headers: { Authorization: `Bearer ${token}` } 
+                }),
+                axios.get('/api/v1/shifts', { 
+                    headers: { Authorization: `Bearer ${token}` } 
+                })
             ]);
-            
             setReports(reportsRes.data);
             setShifts(shiftsRes.data);
             setError(null);
@@ -54,7 +56,7 @@ const DaysPage: React.FC = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [token]);
 
 // Nová pomocná funkce, která bezpečně převede cokoliv na YYYY-MM-DD v lokálním čase
     const safeFormatDate = (dateStr: string) => {
@@ -80,17 +82,17 @@ const DaysPage: React.FC = () => {
                 await axios.put(`/api/v1/reports/${currentDayReport.report_id}`, { 
                     content: reportForm.content, 
                     date: selectedDate 
-                }, { headers });
+                }, { headers: { Authorization: `Bearer ${token}` }});
             } else {
                 // Vytvoření nového pro toto datum
                 await axios.post('/api/v1/reports', { 
                     content: reportForm.content, 
                     date: selectedDate 
-                }, { headers });
+                }, { headers: { Authorization: `Bearer ${token}` }} );
             }
             setIsEditingReport(false);
             // Znovu načteme reporty z backendu
-            const response = await axios.get('/api/v1/reports', { headers });
+            const response = await axios.get('/api/v1/reports', { headers: { Authorization: `Bearer ${token}` }});
             setReports(response.data);
         } catch {
             setError('Nepodařilo se uložit report pro vybraný den.');
@@ -100,8 +102,8 @@ const DaysPage: React.FC = () => {
     const handleReportDelete = async (id: number) => {
         if (!confirm('Opravdu smazat tento report?')) return;
         try {
-            await axios.delete(`/api/v1/reports/${id}`, { headers });
-            const response = await axios.get('/api/v1/reports', { headers });
+            await axios.delete(`/api/v1/reports/${id}`, { headers: { Authorization: `Bearer ${token}` }});
+            const response = await axios.get('/api/v1/reports', { headers: { Authorization: `Bearer ${token}` }});
             setReports(response.data);
             setReportForm({ content: '' });
         } catch {
